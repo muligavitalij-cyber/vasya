@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Вася AI — алгебра і геометрія</title>
+<meta name="description" content="Вася AI рахує приклади, рівняння, системи, площі, об’єми, НСД і НСК, відсотки.">
+<style>
+:root{--bg:#f3f6fb;--grid:#d9e2f1;--ink:#1b2438;--bot:#fff;--me:#2f5bd8;--mut:#66728a;--ln:#cbd5e6;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141a26;--grid:#202a3c;--ink:#e6ecf8;--bot:#1d2638;--me:#4d78f0;--mut:#8f9bb5;--ln:#2d3850}}
+:root[data-theme="dark"]{--bg:#141a26;--grid:#202a3c;--ink:#e6ecf8;--bot:#1d2638;--me:#4d78f0;--mut:#8f9bb5;--ln:#2d3850}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{display:flex;flex-direction:column;background:var(--bg);color:var(--ink);font:17px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px}
+header{padding:14px 16px 8px;border-bottom:2px solid var(--me);background:var(--bg)}
+h1{margin:0;font-size:22px;letter-spacing:.2px}
+header p{margin:2px 0 0;color:var(--mut);font-size:14px}
+#log{flex:1;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:10px}
+.m{max-width:86%;padding:9px 13px;border-radius:14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.b{background:var(--bot);border:1px solid var(--ln);align-self:flex-start;border-bottom-left-radius:4px}
+.u{background:var(--me);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+#chips{display:flex;gap:8px;overflow-x:auto;padding:6px 12px}
+#chips button{flex:none;border:1px solid var(--ln);background:var(--bot);color:var(--ink);border-radius:999px;padding:7px 12px;font:inherit;font-size:14px}
+form{display:flex;gap:8px;padding:8px 12px 12px;background:var(--bg);border-top:1px solid var(--ln)}
+input{flex:1;min-width:0;font:inherit;padding:11px 14px;border-radius:12px;border:1px solid var(--ln);background:var(--bot);color:var(--ink)}
+form button{font:inherit;font-weight:600;padding:0 18px;border:0;border-radius:12px;background:var(--me);color:#fff}
+form .cam{display:flex;align-items:center;background:var(--bot);color:var(--ink);border:1px solid var(--ln);border-radius:12px;padding:0 12px;font-size:20px;cursor:pointer}
+:focus-visible{outline:3px solid var(--me);outline-offset:2px}
+</style>
+</head>
+<body>
+<header><h1>Вася AI</h1><p>Алгебра, геометрія, числа. Пиши як у зошиті.</p></header>
+<div id="log" aria-live="polite"></div>
+<div id="chips"></div>
+<form id="f"><label class="cam" id="cam" for="ph" aria-label="Сфотографувати задачу">📷</label><input id="q" placeholder="Напиши або сфотографуй задачу" autocomplete="off" enterkeyhint="send"><button type="button" id="ok">Ок</button></form>
+<input type="file" id="ph" accept="image/*" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+<script>window.onerror=(m,u,l)=>{const d=document.getElementById("log");if(d){const e=document.createElement("div");e.className="m b";e.textContent="⚠ Помилка: "+m+" (рядок "+l+")";d.appendChild(e)}};</script>
+<script>
+const CH={pi:Math.PI,e:Math.E},R=a=>a*Math.PI/180;
+const F={sqrt:Math.sqrt,abs:Math.abs,log:Math.log10,ln:Math.log,sin:a=>Math.sin(R(a)),cos:a=>Math.cos(R(a)),tan:a=>Math.tan(R(a))};
+const rnd=a=>a[Math.floor(Math.random()*a.length)];
+const fmt=v=>Math.abs(v-Math.round(v))<1e-9?String(Math.round(v)):String(+v.toFixed(4));
+const CY="а-яіїєґ",has=(q,w)=>new RegExp("(?<![" + CY + "])"+w).test(q);
+const PH={
+hi:["Привіт! Я Вася AI. Кидай приклад, рівняння чи задачу з геометрії.","Вітаю! Що будемо рахувати?"],
+who:["Я Вася AI. Вмію: приклади, рівняння й системи, степені, одночлени, многочлени, буквені вирази, дроби, геометрію, відсотки, НСД і НСК. Додай слово «поясни», і я розкажу, як це рахується."],
+ok:["Дякую! Продовжуємо?","Радий допомогти!"],
+no:["Цього я ще не вмію. Глянь підказки під чатом.","Не зрозумів. Дай приклад, рівняння або фігуру з числами."],
+bye:["До зустрічі!","Бувай! Заходь ще."]};
+const res=v=>rnd(["Відповідь: ","Виходить ","Порахував: "])+v;
+const TH={"остач":"Остача — це те, що залишається після ділення, якщо число не ділиться націло.","порядок дій":"Спочатку дужки, потім множення й ділення, потім додавання й віднімання.","дискримінант":"Для ax²+bx+c=0: D=b²−4ac. D>0 — два корені, D=0 — один, D<0 — дійсних коренів немає. x=(−b±√D)/(2a).","піфагор":"У прямокутному трикутнику c²=a²+b², де c — гіпотенуза.","периметр":"Периметр — сума довжин усіх сторін фігури.","коло":"Довжина кола C=2πr, площа круга S=πr².","площ":"Площа: прямокутник a·b, трикутник ½·a·h, круг πr², трапеція (a+b)/2·h.","відсот":"1% — це сота частина числа. p% від N = N·p/100.","пропорц":"Пропорція a/b=c/d. Головна властивість: a·d=b·c.","рівняння":"Рівняння — рівність з невідомим. Переносимо доданки й ділимо на коефіцієнт.","степен":"Степінь aⁿ — це a, помножене само на себе n разів. xᵐ·xⁿ=xᵐ⁺ⁿ, xᵐ:xⁿ=xᵐ⁻ⁿ, (xᵐ)ⁿ=xᵐⁿ, (ab)ⁿ=aⁿbⁿ, a⁰=1.","одночлен":"Одночлен — добуток чисел і змінних у степенях, наприклад 5a²b. Число попереду — коефіцієнт. Одночлени з однаковою буквеною частиною — подібні.","многочлен":"Многочлен — сума одночленів, наприклад x²−5x+6. Щоб помножити многочлени, множимо кожен член на кожен і зводимо подібні доданки.","подібні":"Подібні доданки мають однакову буквену частину. Їх зводимо додаванням коефіцієнтів: 3a+2a=5a.","скорочен":"(a+b)²=a²+2ab+b², (a−b)²=a²−2ab+b², (a−b)(a+b)=a²−b².","дріб":"Дріб a/b — це a, поділене на b. Скорочуємо діленням чисельника й знаменника на спільний дільник. Додаємо через спільний знаменник."};
+const UN=[{мм:.001,см:.01,дм:.1,м:1,км:1000},{г:.001,кг:1,ц:100,т:1000},{с:1,хв:60,год:3600,доб:86400}];
+const AL=[["міліметр","мм"],["сантиметр","см"],["дециметр","дм"],["кілометр","км"],["метр","м"],["кілограм","кг"],["грам","г"],["центнер","ц"],["тон","т"],["секунд","с"],["хвилин","хв"],["годин","год"],["доб","доб"]];
+
+function prep(s){s=s.toLowerCase().replace(/×|•/g,"*").replace(/÷|:/g,"/").replace(/−/g,"-").replace(/\*\*/g,"^").replace(/π/g,"pi");
+s=s.replace(/√\s*(\d+(?:[.,]\d+)?)/g,"sqrt($1)").replace(/√/g,"sqrt").replace(/(\d),(?=\d)/g,"$1.");
+return s.replace(/(\d|\))\s*(?=[a-z(])/g,"$1*").replace(/([xy])\s*(?=\()/g,"$1*").trim()}
+function parse(s,env){let i=0;const ws=()=>{while(s[i]==" ")i++},cl=()=>{ws();if(s[i]!=")")throw 0;i++};
+function ex(){let v=tm();ws();while(s[i]=="+"||s[i]=="-"){const o=s[i++],r=tm();v=o=="+"?v+r:v-r;ws()}return v}
+function tm(){let v=un();ws();while(s[i]=="*"||s[i]=="/"){const o=s[i++],r=un();v=o=="*"?v*r:v/r;ws()}return v}
+function un(){ws();if(s[i]=="-"){i++;return -un()}if(s[i]=="+"){i++;return un()}return pw()}
+function pw(){const b=at();ws();if(s[i]=="^"){i++;return b**un()}return b}
+function at(){ws();if(s[i]=="("){i++;const v=ex();cl();return v}
+let m=/^\d+(\.\d+)?/.exec(s.slice(i));if(m){i+=m[0].length;return +m[0]}
+m=/^[a-z]+/.exec(s.slice(i));if(m){i+=m[0].length;const n=m[0];if(F[n]){ws();if(s[i]!="(")throw 0;i++;const v=ex();cl();return F[n](v)}if(n in env)return env[n]}throw 0}
+const v=ex();ws();if(i<s.length||!isFinite(v))throw 0;return v}
+const side=(s,v={})=>parse(prep(s),{...CH,...v});
+const calc=s=>{if(!/\d/.test(s))return null;try{return side(s)}catch{return null}};
+
+function solveEq(eq){const[l,r]=eq.split("="),f=x=>side(l,{x})-side(r,{x});
+const f0=f(0),f1=f(1),f2=f(2),f3=f(3),a=(f2-2*f1+f0)/2,b=f1-f0-a,c=f0;
+if(Math.abs(f3-(9*a+3*b+c))>1e-6)return null;
+if(Math.abs(a)<1e-9){if(Math.abs(b)<1e-9)return Math.abs(c)<1e-9?"Безліч розв’язків.":"Розв’язків немає.";return"x = "+fmt(-c/b)}
+const d=b*b-4*a*c;
+if(d>1e-9){const s=Math.sqrt(d);return`D = ${fmt(d)}; x₁ = ${fmt((-b+s)/(2*a))}, x₂ = ${fmt((-b-s)/(2*a))}`}
+if(Math.abs(d)<=1e-9)return`D = 0; x = ${fmt(-b/(2*a))}`;
+return`D = ${fmt(d)} < 0, дійсних коренів немає.`}
+function solveSys(eq){const e=eq.split(";").filter(x=>x.includes("="));if(e.length!=2)return null;
+const rows=e.map(t=>{const[l,r]=t.split("="),g=(x,y)=>side(l,{x,y})-side(r,{x,y}),c=g(0,0);return[g(1,0)-c,g(0,1)-c,-c]});
+const[[a1,b1,c1],[a2,b2,c2]]=rows,d=a1*b2-a2*b1;
+if(Math.abs(d)<1e-9)return"Єдиного розв’язку немає.";
+return`x = ${fmt((c1*b2-c2*b1)/d)}, y = ${fmt((a1*c2-a2*c1)/d)}`}
+function checkEq(eq){const p=eq.split("=");if(p.length!=2)return null;const a=calc(p[0]),b=calc(p[1]);
+if(a===null)return null;if(b===null)return res(fmt(a));return Math.abs(a-b)<1e-9?"Вірно ✅":`Невірно ❌: ${fmt(a)} ≠ ${fmt(b)}`}
+
+const gcd=(a,b)=>b?gcd(b,a%b):a,lcm=(a,b)=>a/gcd(a,b)*b;
+const prime=n=>{if(n<2)return false;for(let i=2;i*i<=n;i++)if(n%i==0)return false;return true};
+function factor(n){const f=[];for(let i=2;i*i<=n;i++)while(n%i==0){f.push(i);n/=i}if(n>1)f.push(n);return f}
+function convert(q){const m=/(\d+(?:[.,]\d+)?)\s*([а-яіїєґ]+)\s+(?:в|у|до)\s+([а-яіїєґ]+)/.exec(q);if(!m)return null;
+const un=u=>{for(const[p,a]of AL)if(u.startsWith(p))return a;return u},v=parseFloat(m[1].replace(",",".")),a=un(m[2]),b=un(m[3]);
+for(const g of UN)if(a in g&&b in g)return`${fmt(v)} ${a} = ${fmt(v*g[a]/g[b])} ${b}`;return null}
+
+function geo(q,n){const k=n.length,pi=Math.PI,p=q.includes("периметр"),s=q.includes("площ"),vol=/об'?єм/.test(q),sf=q.includes("поверхн");
+const pair=(nm,P,S)=>p&&!s?`Периметр ${nm} = ${fmt(P)}`:s&&!p?`Площа ${nm} = ${fmt(S)}`:`${nm}: периметр = ${fmt(P)}, площа = ${fmt(S)}`;
+const solid=(nm,V,S)=>vol&&!sf?`Об’єм ${nm} = ${fmt(V)}`:sf&&!vol?`Площа поверхні ${nm} = ${fmt(S)}`:`${nm}: об’єм = ${fmt(V)}, площа поверхні = ${fmt(S)}`;
+if((q.includes("гіпотенуз")||q.includes("катет"))&&k>=2){
+if(q.includes("гіпотенуз")&&q.includes("катет")&&!/катети|катетів/.test(q)){const h=Math.max(n[0],n[1]),l=Math.min(n[0],n[1]);return"Другий катет = "+fmt(Math.sqrt(h*h-l*l))}
+return"Гіпотенуза = "+fmt(Math.hypot(n[0],n[1]))}
+if(/куля|кулі|кулю|сфер/.test(q)&&k>=1){const r=n[0];return solid("кулі",4/3*pi*r**3,4*pi*r*r)}
+if(q.includes("циліндр")&&k>=2){const[r,h]=n;return solid("циліндра",pi*r*r*h,2*pi*r*(r+h))}
+if(q.includes("конус")&&k>=2){const[r,h]=n,l=Math.hypot(r,h);return solid("конуса",pi*r*r*h/3,pi*r*(r+l))}
+if(/паралелепіпед|коробк|бруск/.test(q)&&k>=3){const[a,b,c]=n;return solid("паралелепіпеда",a*b*c,2*(a*b+b*c+a*c))}
+if(q.includes("куб")&&!q.includes("кубічн")&&k>=1)return solid("куба",n[0]**3,6*n[0]*n[0]);
+if(has(q,"(кол[оауі]|круг)")&&k>=1){const r=q.includes("діаметр")?n[0]/2:n[0],L=2*pi*r,S=pi*r*r,lw=p||q.includes("довжин");
+return lw&&!s?"Довжина кола = "+fmt(L):s&&!lw?"Площа круга = "+fmt(S):`Довжина кола = ${fmt(L)}, площа = ${fmt(S)}`}
+if(q.includes("квадрат")&&k>=1&&(p||s||q.includes("діагонал"))){const a=n[0];
+return q.includes("діагонал")&&!(p||s)?"Діагональ квадрата = "+fmt(a*Math.SQRT2):pair("квадрата",4*a,a*a)}
+if(q.includes("прямокутник")&&k>=2)return pair("прямокутника",2*(n[0]+n[1]),n[0]*n[1]);
+if(q.includes("трикутник")){
+if(k>=3){const[a,b,c]=n;if(p&&!s)return"Периметр трикутника = "+fmt(a+b+c);
+if(a+b>c&&a+c>b&&b+c>a){const h=(a+b+c)/2;return`Площа трикутника = ${fmt(Math.sqrt(h*(h-a)*(h-b)*(h-c)))} (формула Герона), периметр = ${fmt(a+b+c)}`}
+return"З таких сторін трикутник не скласти."}
+if(k==2&&s)return"Площа трикутника = "+fmt(n[0]*n[1]/2)}
+if(q.includes("трапец")&&k>=3)return"Площа трапеції = "+fmt((n[0]+n[1])/2*n[2]);
+if(q.includes("паралелограм")&&k>=2)return p?"Периметр паралелограма = "+fmt(2*(n[0]+n[1])):"Площа паралелограма = "+fmt(n[0]*n[1]);
+if(q.includes("ромб")){if(q.includes("діагонал")&&k>=2)return`Площа ромба = ${fmt(n[0]*n[1]/2)}, сторона = ${fmt(Math.hypot(n[0]/2,n[1]/2))}`;if(k>=1)return"Периметр ромба = "+fmt(4*n[0])}
+return null}
+
+const SUP="⁰¹²³⁴⁵⁶⁷⁸⁹",sup=n=>n==1?"":n<0?"^"+n:String(n).split("").map(d=>SUP[d]).join("");
+const rat=x=>{if(Number.isInteger(x))return String(x);for(let d=2;d<=1000;d++){const n=x*d;if(Math.abs(n-Math.round(n))<1e-9)return Math.round(n)+"/"+d}return null},fr=x=>rat(x)||fmt(x);
+const mk=(c,k="")=>c?{[k]:c}:{},kp=k=>k?k.split(",").map(t=>{const[v,e]=t.split(":");return[v,+e]}):[],ks=a=>a.filter(t=>t[1]).sort((x,y)=>x[0]<y[0]?-1:1).map(t=>t.join(":")).join(",");
+const isC=a=>Object.keys(a).every(k=>k===""),cv=a=>a[""]||0;
+const padd=(a,b,s=1)=>{const r={...a};for(const k in b){r[k]=(r[k]||0)+s*b[k];if(Math.abs(r[k])<1e-12)delete r[k]}return r};
+const pmul=(a,b)=>{const r={};for(const i in a)for(const j in b){const o={};kp(i).concat(kp(j)).forEach(([v,e])=>o[v]=(o[v]||0)+e);const k=ks(Object.entries(o));r[k]=(r[k]||0)+a[i]*b[j]}for(const k in r)if(Math.abs(r[k])<1e-12)delete r[k];return r};
+const pinv=a=>{const k=Object.keys(a);if(k.length!=1)throw"div";return{[ks(kp(k[0]).map(([v,e])=>[v,-e]))]:1/a[k[0]]}};
+const ppow=(a,n)=>{if(!Number.isInteger(n)||Math.abs(n)>30)throw"pow";if(n<0)return ppow(pinv(a),-n);let r={"":1};for(let i=0;i<n;i++)r=pmul(r,a);return r};
+const pprep=s=>s.toLowerCase().replace(/(?<![а-яіїєґ])х(?![а-яіїєґ])/g,"x").replace(/×|•|·/g,"*").replace(/÷|:/g,"/").replace(/−/g,"-").replace(/\*\*/g,"^").replace(/(\d),(?=\d)/g,"$1.").replace(/(?<=\d)\s*x\s*(?=\d)/g,"*").replace(/([a-z0-9)])\s*(?=[a-z(])/g,"$1*").trim();
+function pp(s){let i=0;const ws=()=>{while(s[i]==" ")i++};
+const ex=()=>{let v=tm();ws();while(s[i]=="+"||s[i]=="-"){const o=s[i++];v=padd(v,tm(),o=="+"?1:-1);ws()}return v};
+const tm=()=>{let v=un();ws();while(s[i]=="*"||s[i]=="/"){const o=s[i++],r=un();v=o=="*"?pmul(v,r):pmul(v,pinv(r));ws()}return v};
+const un=()=>{ws();if(s[i]=="-"){i++;return pmul({"":-1},un())}if(s[i]=="+"){i++;return un()}return pw()};
+const pw=()=>{const b=at();ws();if(s[i]=="^"){i++;const e=un();if(!isC(e))throw"pow";const n=cv(e);return isC(b)&&(!Number.isInteger(n)||n<0)?mk(cv(b)**n):ppow(b,n)}return b};
+const at=()=>{ws();if(s[i]=="("){i++;const v=ex();ws();if(s[i]!=")")throw 0;i++;return v}
+let m=/^\d+(\.\d+)?/.exec(s.slice(i));if(m){i+=m[0].length;return mk(+m[0])}
+m=/^[a-z]/.exec(s.slice(i));if(m){i++;return mk(1,m[0]+":1")}throw 0};
+const v=ex();ws();if(i<s.length)throw 0;return v}
+function pf(p){const K=Object.keys(p);if(!K.length)return"0";
+const t=K.map(k=>({c:p[k],v:kp(k),d:kp(k).reduce((s,x)=>s+x[1],0)})).sort((a,b)=>{if(b.d!=a.d)return b.d-a.d;const va=Object.fromEntries(a.v),vb=Object.fromEntries(b.v);for(const v of[...new Set([...Object.keys(va),...Object.keys(vb)])].sort()){const d=(vb[v]||0)-(va[v]||0);if(d)return d}return 0});
+return t.map((x,i)=>{const a=Math.abs(x.c),vs=x.v.map(([v,e])=>v+sup(e)).join(""),cs=a==1&&vs?"":(!Number.isInteger(a)&&rat(a)&&vs?"("+rat(a)+")":fr(a)),c=cs+vs;return i?(x.c<0?" − ":" + ")+c:(x.c<0?"−":"")+c}).join("")}
+function fac(p){const T=Object.keys(p).map(k=>({c:p[k],v:kp(k)}));if(!T.length||!T.every(t=>Number.isInteger(t.c)))return null;
+if(T.length==1)return pf(p)+" — це вже одночлен.";
+const g=T.reduce((a,t)=>gcd(a,Math.abs(t.c)),0),V=[...new Set(T.flatMap(t=>t.v.map(x=>x[0])))];
+const mo=V.map(v=>[v,Math.min(...T.map(t=>(t.v.find(x=>x[0]==v)||[0,0])[1]))]).filter(x=>x[1]>0),gm={[ks(mo)]:g},R=pmul(p,pinv(gm)),pre=ks(mo)===""&&g==1?"":pf(gm);
+const RV=[...new Set(Object.keys(R).flatMap(k=>kp(k).map(x=>x[0])))],co=[0,0,0];let ok=RV.length==1,mid=null;
+for(const k in R){const a=kp(k),d=a.length?a[0][1]:0;if(d<0||d>2)ok=false;else co[d]=R[k]}
+if(ok&&co[2]){const[c,b,a]=co,d=b*b-4*a*c,s=Math.sqrt(d);
+if(d>=0&&Number.isInteger(s)){const x=RV[0],rt=r=>{const q=rat(r),[n,m]=q.includes("/")?q.split("/").map(Number):[+q,1];return[n,m]},f=([n,m])=>"("+pf(padd(mk(m,x+":1"),mk(n),-1))+")",r1=rt((-b+s)/(2*a)),r2=rt((-b-s)/(2*a)),k=a/(r1[1]*r2[1]);
+mid=(k!=1?fr(k):"")+(s==0?f(r1)+"²":f(r1)+f(r2))}}
+else if(Object.keys(R).length==2){const t=Object.keys(R).map(k=>({c:R[k],v:kp(k)})).sort((a,b)=>b.c-a.c);
+if(t[0].c>0&&t[1].c<0&&t.every(x=>Number.isInteger(Math.sqrt(Math.abs(x.c)))&&x.v.every(y=>y[1]%2==0))){const h=x=>mk(Math.sqrt(Math.abs(x.c)),ks(x.v.map(y=>[y[0],y[1]/2]))),A=h(t[0]),B=h(t[1]);mid="("+pf(padd(A,B,-1))+")("+pf(padd(A,B))+")"}}
+if(mid)return(pre?pre+"·":"")+mid;return pre?pre+"("+pf(R)+")":null}
+function frac(q){const m=/(\d+)\s*\/\s*(\d+)/.exec(q),a=m&&+m[1],b=m&&+m[2];
+if(/скороти/.test(q)&&m&&b){const g=gcd(a,b);return`${a}/${b} = ${a/g}/${b/g}`+(g>1?` (ділимо чисельник і знаменник на ${g})`:" — вже не скорочується")}
+if(/цілу частину|мішан/.test(q)&&m&&b)return a%b?`${a}/${b} = ${Math.floor(a/b)} ${a%b}/${b}`:`${a}/${b} = ${a/b}`;
+const dd=/(\d+[.,]?\d*)\s*(?:у|в)\s+(?:звичайний\s+)?дріб/.exec(q);if(dd){const x=parseFloat(dd[1].replace(",",".")),r=rat(x);return r?`${fmt(x)} = ${r}`:null}
+const v=calc(q.replace(/(\d+)\s+(\d+)\s*\/\s*(\d+)/g,"($1+$2/$3)").replace(/[а-яіїєґ]+/g," "));if(v===null)return null;
+const r=rat(v);if(r===null||Number.isInteger(v))return res(fmt(v));
+const[n,d]=r.split("/").map(Number),w=Math.trunc(n/d);return r+(Math.abs(n)>d?` = ${w} ${Math.abs(n)%d}/${d}`:"")+` ≈ ${fmt(v)}`}
+const CHAT=[[/як справи|як ти|як життя|як настрій/,["Усе чудово, рахую без втоми 😄 А в тебе як?","Добре! Готовий до задач. А ти як?"]],
+[/погано|сумно|втомив|нудно|не хочу/,["Буває. Давай почнемо з легкого прикладу, я допоможу 💪","Не засмучуйся! Одна проста задача, і піде легше."]],
+[/не розумію|складно|важко|не вмію|допоможи/,["Це нормально, у математиці так буває. Напиши приклад і додай «поясни», розберемо крок за кроком.","Давай розбиратися разом: кидай задачу й напиши «поясни»."]],
+[/як тебе звати|твоє ім|як тебе звуть/,["Мене звати Вася AI 🧮 Я математичний помічник."]],
+[/скільки тобі|хто тебе (створ|зроб)|ти бот|ти людина|ти живий/,["Я програма, а не людина. Мене зробили для математики 🙂"]],
+[/жарт|анекдот|розсміш|пожартуй/,["Чому 6 боїться 7? Бо 7 8 9 🙃","Математик каже: «Я не лінивий, я просто оптимізую кількість дій»."]],
+[/ти розумний|ти молодець|ти класний/,["Дякую, мені приємно! 😊"]],
+[/(^|\s)(ок|добре|норм|ясно|зрозуміло|ага)(\s|$)/,["Супер! Що рахуємо далі?","Чудово 🙂 Кидай наступний приклад."]],
+[/домашк|контрольн|урок|іспит/,["Допоможу! Пиши завдання по одному, а я розв’яжу й поясню."]],
+[/що робити|з чого почати|порадь/,["Почни з простого: напиши рівняння, дріб або многочлен, а я розберу його кроками."]]];
+const chat=q=>{for(const[r,a]of CHAT)if(r.test(q))return rnd(a);return null};
+function why(q){q=q.toLowerCase().replace(/[’ʼ`]/g,"'");const e=pprep(q).replace(/[а-яіїєґ']+/g," ");
+try{if(q.includes("=")&&!q.includes(";")&&/x/.test(e)&&!/y/.test(e)){const[l,r]=e.split("="),f=x=>side(l,{x})-side(r,{x}),c=f(0),a=(f(2)-2*f(1)+c)/2,b=f(1)-c-a;
+if(Math.abs(a)>1e-9){const d=b*b-4*a*c;return`Квадратне рівняння: зводимо до ax²+bx+c=0.\nТут a=${fmt(a)}, b=${fmt(b)}, c=${fmt(c)}.\nДискримінант D=b²−4ac=${fmt(d)}.\n`+(d>1e-9?"D>0, два корені: x=(−b±√D)/(2a).":Math.abs(d)<=1e-9?"D=0, один корінь: x=−b/(2a).":"D<0, дійсних коренів немає.")}
+if(Math.abs(b)>1e-9)return`Лінійне рівняння: збираємо x в один бік, числа в інший.\n${fmt(b)}·x = ${fmt(-c)}, тому x = ${fmt(-c)} : ${fmt(b)} = ${fmt(-c/b)}.`}}catch{}
+const W=[[/;/,"Система: з одного рівняння виражаємо x через y (або додаємо рівняння, щоб одна змінна зникла), підставляємо в друге й знаходимо обидві змінні."],
+[/множник|розклад/,"Розклад на множники: 1) виносимо спільний множник за дужки; 2) a²−b²=(a−b)(a+b); 3) тричлен ax²+bx+c розкладаємо через корені: a(x−x₁)(x−x₂)."],
+[/\d\s*\/\s*\d|дріб|скороти/,"Дроби: щоб додати чи відняти, зводимо до спільного знаменника й діємо з чисельниками. Множимо: чисельник на чисельник, знаменник на знаменник. Ділимо: множимо на перевернутий дріб. Скорочуємо діленням на спільний дільник."],
+[/[a-z]|\^|степен|одночлен|многочлен/,"Степені: xᵐ·xⁿ=xᵐ⁺ⁿ, xᵐ:xⁿ=xᵐ⁻ⁿ, (xᵐ)ⁿ=xᵐⁿ, (ab)ⁿ=aⁿbⁿ. Многочлени: розкриваємо дужки (кожен член на кожен), потім зводимо подібні доданки. Формули: (a±b)²=a²±2ab+b², (a−b)(a+b)=a²−b²."],
+[/відсот|%/,"1% — це 1/100 числа. p% від N = N·p:100."],
+[/нсд|нск/,"НСД — найбільше число, на яке діляться обидва числа. НСК — найменше число, що ділиться на обидва. НСК=a·b:НСД."],
+[/гіпотенуз|катет/,"Теорема Піфагора: c²=a²+b², c — гіпотенуза. Катет a=√(c²−b²)."],
+[/трикутник/,"Площа трикутника ½·a·h. За трьома сторонами — формула Герона: S=√(p(p−a)(p−b)(p−c)), p — півпериметр."],
+[/кол|круг|куля|кулі/,"Коло: довжина C=2πr, площа круга S=πr². Куля: V=4/3·πr³, S=4πr²."],
+[/об'?єм|циліндр|конус|куб/,"Об’єм: куб a³, паралелепіпед a·b·c, циліндр πr²h, конус ⅓πr²h."],
+[/площ|периметр|прямокутник|квадрат/,"Периметр — сума всіх сторін. Площа прямокутника a·b, квадрата a²."]];
+for(const[r,t]of W)if(r.test(q))return t;return"Порядок дій: спочатку дужки й степені, потім множення й ділення, потім додавання й віднімання."}
+let LAST="";
+function answer(text){let q=text.toLowerCase().trim();
+if(/^(поясни|поясни детальніше|покажи кроки|чому так|як ти це порахував)[?!. ]*$/.test(q))return LAST?"📘 "+why(LAST):"Спочатку напиши приклад, а потім попроси пояснити.";
+const ask=/поясн|покроково|кроки/.test(q)&&/\d|[a-z]/.test(q.replace(/[а-яіїєґ]+/g," ")),clean=ask?text.replace(/поясни(ти)?|покроково|покажи кроки|кроки/gi," "):text,a=core(clean);
+if(/\d|[a-z]/.test(clean))LAST=clean;return ask?a+"\n\n📘 "+why(clean):a}
+function core(text){
+const q=text.toLowerCase().trim().replace(/[’ʼ`]/g,"'"),words=q.split(/\s+/).map(w=>w.replace(/[?.,!"'%]/g,""));
+const n=(q.match(/\d+(?:[.,]\d+)?/g)||[]).map(v=>parseFloat(v.replace(",","."))),k=n.length;
+if(words.some(w=>["привіт","привет","вітаю","здоров","хай"].includes(w))||q.includes("добрий день"))return rnd(PH.hi);
+if(/хто ти|що ти вмієш|що ти можеш/.test(q))return rnd(PH.who);
+if(words.some(w=>["дякую","спасибі","круто","супер","молодець"].includes(w)))return rnd(PH.ok);
+if(words.includes("пока")||words.includes("бувай"))return rnd(PH.bye);
+if(/^\/?(help|допомога|меню|команди)$/.test(q))return"Що я вмію:\n• приклади: (12+8)*3, 2^10, sqrt(144)\n• рівняння: 2x+3=11, x^2-5x+6=0\n• системи: x+y=5; x-y=1\n• многочлени: (a+b)^2, 2x^2*3x^3\n• розклад: розклади x^2-9\n• підстановка: 2a+3b при a=2, b=5\n• дроби: 3/4+5/6, скороти 12/18\n• геометрія: площа кола радіус 5, об’єм циліндра 2 5\n• числа: НСК 4 6, розклади 60\n• задачі: було 4 яблука, стало 7, скільки з’явилось\n• додай «поясни», і я покажу кроки";
+if(!/\d/.test(q)){const c0=chat(q);if(c0)return c0}
+const sb=/(?<![а-яіїєґ])(?:при|якщо|коли|де)\s+([a-zх]\s*=.*)$/.exec(q);
+if(sb){const env={};sb[1].replace(/([a-zх])\s*=\s*(-?\d+(?:[.,]\d+)?)/g,(_,v,n)=>{env[v=="х"?"x":v]=parseFloat(n.replace(",","."))});
+const ex=pprep(q.slice(0,sb.index)).replace(/[а-яіїєґ']+/g," ").trim();
+if(/[a-z]/.test(ex)&&Object.keys(env).length){try{const p=pp(ex);let s=0;for(const k in p){let t=p[k];kp(k).forEach(([v,e])=>{if(!(v in env))throw"var";t*=env[v]**e});s+=t}return`${pf(p)} при ${Object.entries(env).map(e=>e.join("=")).join(", ")} дорівнює ${fmt(s)}`}catch(e){if(e=="var")return"Не вистачає значення для якоїсь змінної."}}}
+if(!q.includes("=")){const ex=pprep(q).replace(/[а-яіїєґ']+/g," ").trim();
+if(/[a-z]/.test(ex)&&/[\d+\-*\/^()]/.test(ex)&&!/sin|cos|tan|sqrt|abs|log|ln|pi/.test(ex)){try{const p=pp(ex);if(/множник|розклад/.test(q)){const f=fac(p);return f?"Розклад: "+f:"Цей вираз я розкласти не зміг."}return"Результат: "+pf(p)}catch(e){if(e=="div")return"Ділити можу на число чи одночлен, а на многочлен поки не вмію.";if(e=="pow")return"Степінь має бути цілим числом."}}
+if(/\d\s*\/\s*\d|скороти/.test(q)){const f=frac(q);if(f)return f}}
+if(q.includes("=")){const eq=q.replace(/(?<![а-яіїєґ])х(?![а-яіїєґ])/g,"x").replace(/[а-яіїєґ']+/g," ");let r=null;
+try{r=eq.includes(";")?solveSys(eq):eq.includes("x")?solveEq(eq):checkEq(eq)}catch{}if(r)return r}
+if(/що таке|поясни|формул|теорем/.test(q))for(const key in TH)if(q.includes(key))return TH[key];
+const c=convert(q);if(c)return c;
+if((/відсот|процент/.test(q)||(q.includes("%")&&q.includes("від")))&&k>=2&&n[1]){
+if(/який відсоток|скільки відсотків|скільки процентів/.test(q))return`${fmt(n[0])} — це ${fmt(n[0]/n[1]*100)}% від ${fmt(n[1])}.`;
+return`${fmt(n[0])}% від ${fmt(n[1])} = ${fmt(n[0]*n[1]/100)}`}
+if(/нсд|найбільший спільний дільник/.test(q)&&k>=2)return"НСД = "+n.map(Math.round).reduce(gcd);
+if(/нск|найменше спільне кратне/.test(q)&&k>=2)return"НСК = "+n.map(Math.round).reduce(lcm);
+if(q.includes("факторіал")&&k&&n[0]<=170){let f=1;for(let i=2;i<=n[0];i++)f*=i;return String(f)}
+if(q.includes("просте")&&words.includes("чи")&&k)return`${n[0]} ${prime(n[0])?"просте":"не просте"}.`;
+if(/розклад|множник/.test(q)&&k&&n[0]>1&&n[0]<=1e12){const f=factor(n[0]);return f.length==1?`${n[0]} просте.`:`${n[0]} = `+f.join(" × ")}
+if(q.includes("корінь")&&k)return`√${fmt(n[0])} = ${fmt(Math.sqrt(n[0]))}`;
+if(q.includes("степен")&&k>=2&&n[1]<=1000)return fmt(n[0]**n[1]);
+if(q.includes("квадрат числа")&&k)return fmt(n[0]**2);
+if(q.includes("куб числа")&&k)return fmt(n[0]**3);
+if(q.includes("остач")&&k>=2&&n[1]){const a=Math.floor(n[0]),b=Math.floor(n[1]);return`${a} : ${b} = ${Math.floor(a/b)}, остача ${a%b}`}
+if(/що більше|що менше/.test(q)&&k>=2){if(n[0]==n[1])return"Числа рівні.";const sm=q.includes("що менше");return`${sm?"Менше":"Більше"} число ${fmt(sm?Math.min(n[0],n[1]):Math.max(n[0],n[1]))}.`}
+const g=geo(q,n);if(g)return g;
+if(k>=2){if(/було/.test(q)&&/стало|тепер/.test(q)&&!/прийшло|докупили|додали|з'їли|віддали|витратили/.test(q))return res(fmt(Math.abs(n[1]-n[0])))+(n[1]>n[0]?" (додалось)":" (зменшилось)");
+if(/залишилось|залишилося|віддали|витратили|з'їли|лишилось/.test(q))return res(fmt(n[0]-n[1]));
+if(/всього|разом|стало|докупили|прийшло/.test(q))return res(fmt(n[0]+n[1]))}
+let ex=q;for(const w of["скільки буде","скільки це","обчисли","порахуй","розрахуй","?"])ex=ex.replace(w,"");
+ex=ex.replace(/(?<=\d)\s*[xх]\s*(?=\d)/g,"*");const v=calc(ex);if(v!==null)return res(fmt(v));
+return chat(q)||rnd(PH.no)}
+
+const log=document.getElementById("log"),inp=document.getElementById("q");
+function add(t,c){const d=document.createElement("div");d.className="m "+c;d.textContent=t;log.appendChild(d);log.scrollTop=log.scrollHeight}
+function send(t){t=t.trim();if(!t)return;add(t,"u");let a;try{a=answer(t)}catch{a=rnd(PH.no)}add(a,"b")}
+const go=()=>{send(inp.value);inp.value=""},ok=document.getElementById("ok");
+ok.addEventListener("pointerdown",e=>e.preventDefault());
+ok.addEventListener("click",go);
+inp.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();go()}});
+document.getElementById("f").addEventListener("submit",e=>{e.preventDefault();go()});
+const chips=document.getElementById("chips");
+["x^2 - 5x + 6 = 0","x + y = 5; x - y = 1","площа кола радіус 5","площа трикутника 3 4 5","об’єм циліндра 2 5","НСК 4 6","20 відсотків від 150","2 год в хв","розклади 60","(a+b)^2","2x^2 * 3x^3","3/4 + 5/6","розклади x^2 - 9","2a + 3b при a=2, b=5","що таке многочлен","як справи"].forEach(t=>{
+const b=document.createElement("button");b.type="button";b.textContent=t;b.onclick=()=>send(t);chips.appendChild(b)});
+add("Привіт! Я Вася AI. Пиши приклад, рівняння чи задачу з геометрії, або тисни підказку внизу.","b");
+
+// ===== розпізнавання фото (Tesseract.js, працює в браузері) =====
+const ph=document.getElementById("ph"),cam=document.getElementById("cam");
+let TS=null;
+const loadTS=()=>TS||(TS=new Promise((ok,no)=>{const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";s.onload=ok;s.onerror=()=>{TS=null;no()};document.head.appendChild(s)}));
+function prepImg(file){return new Promise((ok,no)=>{const im=new Image();im.onload=()=>{const k=Math.min(2,1600/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);const x=c.getContext("2d");x.drawImage(im,0,0,c.width,c.height);const d=x.getImageData(0,0,c.width,c.height),p=d.data;for(let i=0;i<p.length;i+=4){const g=.299*p[i]+.587*p[i+1]+.114*p[i+2],v=Math.max(0,Math.min(255,(g-128)*1.5+128));p[i]=p[i+1]=p[i+2]=v}x.putImageData(d,0,0);URL.revokeObjectURL(im.src);ok(c)};im.onerror=no;im.src=URL.createObjectURL(file)})}
+ph.onchange=async()=>{const f=ph.files[0];ph.value="";if(!f)return;
+add("📷 Фото отримав, розпізнаю. Перший раз може тривати до хвилини.","b");
+try{await loadTS();const c=await prepImg(f),w=await Tesseract.createWorker("ukr+eng"),r=await w.recognize(c);await w.terminate();
+const t=r.data.text.replace(/[–—−]/g,"-").replace(/\s*\n\s*/g," ").replace(/\s+/g," ").trim();
+if(!t){add("Нічого не розпізнав. Сфотографуй ближче й рівніше, при гарному світлі.","b");return}
+inp.value=t;inp.focus();add("Розпізнав: "+t+"\n\nПеревір і виправ у полі внизу, потім натисни Ок.","b")}
+catch(e){add("Не вийшло розпізнати. Перевір інтернет (першого разу треба завантажити модель) і спробуй ще.","b")}};
+</script>
+</body>
+</html>
